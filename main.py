@@ -140,44 +140,66 @@ def get_suggested_items_from_db(filename):
     return suggested_items_dict
 
 
-def recent_items_calc(suggested_items_dict, matches_db_filename, page_count=50):
+def recent_items_calc(suggested_items_dict, matches_db_filename, page_count, coef):
     recent_items_url = "https://eu.tamrieltradecentre.com/pc/Trade/SearchResult?ItemID=&SearchType=Sell" \
                        "&ItemNamePattern=&ItemCategory1ID=3&ItemCategory2ID=17&ItemTraitID=&ItemQualityID=3" \
                        "&IsChampionPoint=false&LevelMin=&LevelMax=&MasterWritVoucherMin=&MasterWritVoucherMax" \
                        "=&AmountMin=&AmountMax=&PriceMin=&PriceMax=&page=1 "
 
-    matches_db = open(matches_db_filename, 'w+')
-    matches_db.write("{:>30} {:>20} {:>20}".format("Item name", "Current Price", "Suggested Price"))
-    for i in range(1, page_count + 1):
-        database_url = recent_items_url.replace("&page=" + str(i), "&page=" + str(i + 1))
-        page = requests.get(database_url)
-        soup = BeautifulSoup(page.text, 'html.parser')
+    with open(matches_db_filename, "w") as matches_db:
+        matches_db.write("{:>50} {:>25} {:>30} {:>30} {:>33}\n".format(
+            "Item name", "Current Price", "Suggested Price", "Location", "User"))
+        # matches_db.close()
+        for i in range(1, page_count + 1):
+            recent_items_url = recent_items_url.replace("&page=" + str(i), "&page=" + str(i + 1))
+            page = requests.get(recent_items_url)
+            soup = BeautifulSoup(page.text, 'html.parser')
 
-        # Get names of items
-        item_names = alternate_get_item_names(soup, database_url)
+            # Get names of items
+            item_names = alternate_get_item_names(soup, recent_items_url)
 
-        flag = False
-        # Get prices and create new db file with matches
-        all_prices = soup.findAll("td", {"class": "gold-amount bold"})
-        for price, item_name in zip(all_prices, item_names):
-            if suggested_items_dict.get(item_name):
-                price = filtering_data(price, num_type=None, digit=False)
-                price = price.split('X')[0]
-                if suggested_items_dict.get(item_name) > int(price) * 1.5:
-                    matches_db.write("{} {} {}".format(item_name, price, suggested_items_dict.get(item_name)))
-                    flag = True
+            # Get trader and location info
+            # This fields have the same class of element, we need to get them all and then sort it like list of tuples
+            trader_or_location_list_unsorted = []
+            trader_location_list_sorted = []
+            traders_and_locations = soup.findAll("td", {"class": "hidden-xs"})
+            for trader_or_location in traders_and_locations:
+                trader_or_location = filtering_data(trader_or_location, num_type=None, digit=False)
+                if trader_or_location != '':
+                    trader_or_location_list_unsorted.append(trader_or_location)
 
-        print("Page {}/{} is done!".format(str(i), str(page_count)))
-        if flag:
-            print("We found something! Check db")
-        else:
-            print("Empty...")
-        time.sleep(5)
-    matches_db.close()
-    print("Search done, check {} file".format(matches_db_filename))
+            for ind in range(0, len(trader_or_location_list_unsorted) - 1, 2):
+                trader_location_list_sorted.append((trader_or_location_list_unsorted[ind + 1],
+                                                    trader_or_location_list_unsorted[ind]))
+
+            flag = False
+            # Get prices and create new db file with matches
+            all_prices = soup.findAll("td", {"class": "gold-amount bold"})
+            for price, item_name in zip(all_prices, item_names):
+                if suggested_items_dict.get(item_name):
+                    price = filtering_data(price, num_type=None, digit=False)
+                    price = price.split('X')[0]
+                    if suggested_items_dict.get(item_name) > int(price) * coef:
+                        index = item_names.index(item_name)
+                        trader_name = trader_location_list_sorted[index][0]
+                        trader_location = trader_location_list_sorted[index][1]
+                        matches_db.write(
+                            "{:>50} {:>20} {:>30} {:>50} {:>20}\n".format(
+                                item_name, price, suggested_items_dict.get(item_name), trader_name, trader_location))
+                        flag = True
+
+            print("Page {}/{} is done!".format(str(i), str(page_count)))
+            if flag:
+                print("We found something! Check db")
+            else:
+                print("Empty...")
+            # time.sleep(5)
+        print("Search done, check {} file".format(matches_db_filename))
 
 
 def main():
+    coefficient = 1.5
+    page_count = 50
     print("Collect suggested items or recent? (1/2)")
     answer = input()
     if answer == "1":
@@ -186,7 +208,9 @@ def main():
         print("Insert filename of db with suggested items:")
         filename = input()
         suggested_items_dict = get_suggested_items_from_db(filename)
-        recent_items_calc(suggested_items_dict=suggested_items_dict, matches_db_filename="matches_db")
+        print("Searching with coefficient: {}, total pages: {}\n".format(coefficient, page_count))
+        recent_items_calc(suggested_items_dict=suggested_items_dict,
+                          matches_db_filename="matches_db", coef=coefficient, page_count=page_count)
     else:
         print("Wrong answer, try again...")
         return 0
