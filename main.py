@@ -210,7 +210,7 @@ def main():
         suggested_items_dict = get_suggested_items_from_db(filename)
         print("Searching with coefficient: {}, total pages: {}\n".format(coefficient, page_count))
         recent_items_calc(suggested_items_dict=suggested_items_dict,
-                          matches_db_filename="matches_db", coef=coefficient, page_count=page_count)
+                          matches_db_filename="matches_db.txt", coef=coefficient, page_count=page_count)
     else:
         print("Wrong answer, try again...")
         return 0
