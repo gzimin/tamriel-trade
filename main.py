@@ -238,17 +238,6 @@ def recent_items_calc(recent_items_url, suggested_items_dict, matches_db_filenam
 def main():
     coefficient = 1.5
     page_count = 50
-    items_with_suggested_prices_url_fine = "https://eu.tamrieltradecentre.com/pc/Trade/SearchResult?ItemID" \
-                                           "=&SearchType=PriceCheck&ItemNamePattern=&ItemCategory1ID=3" \
-                                           "&ItemCategory2ID=11&ItemCategory3ID=37&ItemTraitID=&ItemQualityID" \
-                                           "=&IsChampionPoint=false&LevelMin=&LevelMax=&MasterWritVoucherMin" \
-                                           "=&MasterWritVoucherMax= "
-    items_with_suggested_prices_url_epic = \
-        'https://eu.tamrieltradecentre.com/pc/Trade/SearchResult?ItemID=&SearchType=PriceCheck' \
-        '&ItemNamePattern=&ItemCategory1ID=3&ItemCategory2ID=17&ItemTraitID=&ItemQualityID=3' \
-        '&IsChampionPoint=false&LevelMin=&LevelMax=&MasterWritVoucherMin=&MasterWritVoucherMax=&page=1'
-    suggested_items_db_filename = "db"
-    # Check quality of
 
     print("Collect suggested items or recent? (1/2)")
     answer = input()
