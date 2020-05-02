@@ -216,7 +216,7 @@ def recent_items_calc(recent_items_url, suggested_items_dict, matches_db_filenam
             if suggested_items_dict.get(item_name):
                 price = filtering_data(price, num_type=None, digit=False)
                 price = price.split('X')[0]
-                if suggested_items_dict.get(item_name) > int(price) * coef:
+                if suggested_items_dict.get(item_name) > float(price) * coef:
                     index = item_names.index(item_name)
                     trader_name = trader_location_list_sorted[index][0]
                     trader_location = trader_location_list_sorted[index][1]
