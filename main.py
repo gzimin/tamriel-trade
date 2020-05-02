@@ -2,10 +2,6 @@ import requests
 
 from bs4 import BeautifulSoup
 
-import time
-
-import re
-
 
 def filtering_data(value, num_type=None, digit=True):
     if num_type is None or num_type in value.text:
@@ -65,68 +61,44 @@ def get_item_names(soup, items_url):
     return item_names
 
 
-def suggested_items_calc(items_with_suggested_prices_url, file_name):
+def get_items_with_suggested_price(base_items_url, database_file_name, page_count=50):
 
-    page = requests.get(items_with_suggested_prices_url)
-    soup = BeautifulSoup(page.text, 'html.parser')
-    suggested_prices = soup.findAll("span", {"class": "gold-amount bold"})
+    print("Getting items with suggested prices:\n"
+          "Base Link = {}\n"
+          "Page Count = {}\n"
+          "Database Filename = {}\n".format(base_items_url, page_count, database_file_name))
 
-    item_names = alternate_get_item_names(soup, items_with_suggested_prices_url)
-    # Gather all suggested prices
-    # We need to create some flag to get only half of this values
-    first_suggested_prices = []
-    flag = True
-    for suggested_price in suggested_prices:
-        # import pdb; pdb.set_trace()
-        if flag:
-            first_price = filtering_data(suggested_price)
-            if first_price:
-                first_suggested_prices.append(first_price)
-        flag = not flag
+    # Once open file for write titles
+    with open(database_file_name, 'w+') as db_file:
+        db_file.write("{:>35} {:>40}\n".format("Item", "Suggested price"))
 
-    # Write Item and suggested price to db file
-    file = open(file_name, "a")
-    for item_name, suggested_price in zip(item_names, first_suggested_prices):
-        whole_string = "{:>40} {:>30}\n".format(item_name, suggested_price)
-        file.write(whole_string)
-    file.close()
+    # Write all data
+    for i in range(page_count):
+        items_url = base_items_url.replace("&page=" + str(i), "&page=" + str(i + 1))
+        page = requests.get(items_url)
+        soup = BeautifulSoup(page.text, 'html.parser')
 
+        # Check for captcha
+        if not soup.find("table", {"class": "trade-list-table"}):
+            print("We catch captcha, go to:\n {}", items_url)
+            input("Then press Enter here:")
 
-def suggested_items_print():
-    items_with_suggested_prices_url = 'https://eu.tamrieltradecentre.com/pc/Trade/SearchResult?ItemID=&SearchType=PriceCheck' \
-                                 '&ItemNamePattern=&ItemCategory1ID=3&ItemCategory2ID=17&ItemTraitID=&ItemQualityID=3' \
-                                 '&IsChampionPoint=false&LevelMin=&LevelMax=&MasterWritVoucherMin=&MasterWritVoucherMax=&page=1'
-    page = requests.get(items_with_suggested_prices_url)
-    soup = BeautifulSoup(page.text, 'html.parser')
-
-    # get last page of this database
-    page_list = soup.findAll("a", {"class": "hidden-sm hidden-xs"})
-    last_page = int(page_list[1].text)
-
-    print("Type database filename:")
-    file_name = input()
-    print("This file will be overrided")
-    file = open(file_name, "w")
-    print("file {} was cleaned".format(file_name))
-    file.write("{:>35} {:>40}\n".format("Item", "Suggested price"))
-    file.close()
-    start_time = time.time()
-    print("Calculating...\n")
-
-    for i in range(1, last_page + 1):
-        items_with_suggested_prices_url = \
-            items_with_suggested_prices_url.replace("&page=" + str(i), "&page=" + str(i + 1))
-        suggested_items_calc(items_with_suggested_prices_url,  file_name)
-        print(items_with_suggested_prices_url[-10:])
-        print("Page {}/{} complete!".format(str(i), str(last_page)))
-    end_time = time.time()
-
-    print("Done, check {} file".format(file_name))
-    print("Elapsed time: {:03.2f} seconds".format(end_time - start_time))
+        # Get all body elements
+        tbody_elem = soup.find("tbody")
+        list_of_items = tbody_elem.findAll("tr")
+        for item in list_of_items:
+            if not item.has_attr("class"):
+                if item.find("span", {"class": "gold-amount bold"}):
+                    suggested_price = item.find("span", {"class": "gold-amount bold"})
+                    suggested_price = filtering_data(suggested_price)
+                    name = item.find("div", {"class": "item-quality-epic"}).text.strip()
+                    whole_string = "{:>40} {:>30}\n".format(name, suggested_price)
+                    with open(database_file_name, 'a') as db_file:
+                        db_file.write(whole_string)
+        print("Page {}/{} complete!".format(i + 1, page_count))
 
 
 def get_suggested_items_from_db(filename):
-    suggested_items_list = []
     suggested_items_dict = {}
     with open(filename, 'r+') as suggested_items_file:
         suggested_items_list = suggested_items_file.readlines()
@@ -200,10 +172,15 @@ def recent_items_calc(suggested_items_dict, matches_db_filename, page_count, coe
 def main():
     coefficient = 1.5
     page_count = 50
+    items_with_suggested_prices_url = \
+        'https://eu.tamrieltradecentre.com/pc/Trade/SearchResult?ItemID=&SearchType=PriceCheck' \
+        '&ItemNamePattern=&ItemCategory1ID=3&ItemCategory2ID=17&ItemTraitID=&ItemQualityID=3' \
+        '&IsChampionPoint=false&LevelMin=&LevelMax=&MasterWritVoucherMin=&MasterWritVoucherMax=&page=1'
+    suggested_items_db_filename = "db"
     print("Collect suggested items or recent? (1/2)")
     answer = input()
     if answer == "1":
-        suggested_items_print()
+        get_items_with_suggested_price(items_with_suggested_prices_url, suggested_items_db_filename, page_count=50)
     elif answer == "2":
         print("Insert filename of db with suggested items:")
         filename = input()
