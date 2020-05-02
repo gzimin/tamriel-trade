@@ -2,6 +2,29 @@ import requests
 
 from bs4 import BeautifulSoup
 
+# Constant name of items quality
+QUALITIES = {
+    "normal": "ItemQualityID=0",
+    "fine": "ItemQualityID=1",
+    "superior": "ItemQualityID=2",
+    "epic": "ItemQualityID=3",
+    "legendary": "ItemQualityID=4",
+    }
+
+
+def calc_maximum_pages(items_url):
+    # Set very big num to page to get real last page
+    if "&page=" in items_url:
+        page_num_length = len(items_url.split("&page=")[1])
+        num = "100000"
+        items_url = items_url[:-page_num_length] + num
+    else:
+        items_url = items_url + "&page=100000000"
+
+    page = requests.get(items_url)
+    soup = BeautifulSoup(page.text, 'html.parser')
+    num_page = soup.find("li", {"class": "active"})
+    return num_page.text
 
 def filtering_data(value, num_type=None, digit=True):
     if num_type is None or num_type in value.text:
@@ -61,15 +84,22 @@ def get_item_names(soup, items_url):
     return item_names
 
 
-def get_items_with_suggested_price(base_items_url, database_file_name, page_count=50):
+def get_items_with_suggested_price(base_items_url, page_count=None):
+
+    # Check quality of items
+    db_filename = "db"
+    for key, value in QUALITIES.items():
+        if value in base_items_url:
+            db_filename = db_filename +  "_" + key
+            break
 
     print("Getting items with suggested prices:\n"
           "Base Link = {}\n"
           "Page Count = {}\n"
-          "Database Filename = {}\n".format(base_items_url, page_count, database_file_name))
+          "Database Filename = {}\n".format(base_items_url, page_count, db_filename))
 
     # Once open file for write titles
-    with open(database_file_name, 'w+') as db_file:
+    with open(db_filename, 'w+') as db_file:
         db_file.write("{:>35} {:>40}\n".format("Item", "Suggested price"))
 
     # Write all data
@@ -80,8 +110,10 @@ def get_items_with_suggested_price(base_items_url, database_file_name, page_coun
 
         # Check for captcha
         if not soup.find("table", {"class": "trade-list-table"}):
-            print("We catch captcha, go to:\n {}", items_url)
+            print("We catch captcha, go to:\n {}".format(items_url))
             input("Then press Enter here:")
+            page = requests.get(items_url)
+            soup = BeautifulSoup(page.text, 'html.parser')
 
         # Get all body elements
         tbody_elem = soup.find("tbody")
@@ -93,7 +125,7 @@ def get_items_with_suggested_price(base_items_url, database_file_name, page_coun
                     suggested_price = filtering_data(suggested_price)
                     name = item.find("div", {"class": "item-quality-epic"}).text.strip()
                     whole_string = "{:>40} {:>30}\n".format(name, suggested_price)
-                    with open(database_file_name, 'a') as db_file:
+                    with open(db_filename, 'a') as db_file:
                         db_file.write(whole_string)
         print("Page {}/{} complete!".format(i + 1, page_count))
 
@@ -172,15 +204,28 @@ def recent_items_calc(suggested_items_dict, matches_db_filename, page_count, coe
 def main():
     coefficient = 1.5
     page_count = 50
-    items_with_suggested_prices_url = \
+    items_with_suggested_prices_url_fine = "https://eu.tamrieltradecentre.com/pc/Trade/SearchResult?ItemID" \
+                                           "=&SearchType=PriceCheck&ItemNamePattern=&ItemCategory1ID=3" \
+                                           "&ItemCategory2ID=11&ItemCategory3ID=37&ItemTraitID=&ItemQualityID" \
+                                           "=&IsChampionPoint=false&LevelMin=&LevelMax=&MasterWritVoucherMin" \
+                                           "=&MasterWritVoucherMax= "
+    items_with_suggested_prices_url_epic = \
         'https://eu.tamrieltradecentre.com/pc/Trade/SearchResult?ItemID=&SearchType=PriceCheck' \
         '&ItemNamePattern=&ItemCategory1ID=3&ItemCategory2ID=17&ItemTraitID=&ItemQualityID=3' \
         '&IsChampionPoint=false&LevelMin=&LevelMax=&MasterWritVoucherMin=&MasterWritVoucherMax=&page=1'
     suggested_items_db_filename = "db"
+    # Check quality of
+
     print("Collect suggested items or recent? (1/2)")
     answer = input()
     if answer == "1":
-        get_items_with_suggested_price(items_with_suggested_prices_url, suggested_items_db_filename, page_count=50)
+        items_url = input("Paste url with suggested items: ")
+        page_ans = input("Calc all pages or insert num of pages(Y/Number): ")
+        if page_ans == "Y":
+            page_count = calc_maximum_pages(items_url)
+            get_items_with_suggested_price(items_url, page_count=int(page_count))
+        else:
+            get_items_with_suggested_price(items_url, page_count=int(page_ans))
     elif answer == "2":
         print("Insert filename of db with suggested items:")
         filename = input()
