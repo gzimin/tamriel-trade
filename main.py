@@ -11,6 +11,14 @@ QUALITIES = {
     "legendary": "ItemQualityID=4",
     }
 
+DIV_QUALITIES = {
+    "normal": "item-quality-normal",
+    "fine": "item-quality-fine",
+    "superior": "item-quality-superior",
+    "epic": "item-quality-epic",
+    "legendary": "item-quality-legendary",
+    }
+
 
 def calc_maximum_pages(items_url):
     # Set very big num to page to get real last page
@@ -25,6 +33,7 @@ def calc_maximum_pages(items_url):
     soup = BeautifulSoup(page.text, 'html.parser')
     num_page = soup.find("li", {"class": "active"})
     return num_page.text
+
 
 def filtering_data(value, num_type=None, digit=True):
     if num_type is None or num_type in value.text:
@@ -86,11 +95,13 @@ def get_item_names(soup, items_url):
 
 def get_items_with_suggested_price(base_items_url, page_count=None):
 
+    item_quality = "item-quality-epic"
     # Check quality of items
     db_filename = "db"
     for key, value in QUALITIES.items():
         if value in base_items_url:
-            db_filename = db_filename +  "_" + key
+            db_filename = db_filename + "_" + key
+            item_quality = DIV_QUALITIES[key]
             break
 
     print("Getting items with suggested prices:\n"
@@ -102,17 +113,25 @@ def get_items_with_suggested_price(base_items_url, page_count=None):
     with open(db_filename, 'w+') as db_file:
         db_file.write("{:>35} {:>40}\n".format("Item", "Suggested price"))
 
+    # Check page argument in url
+    if "&page=" in base_items_url:
+        page_num_length = len(base_items_url.split("&page=")[1])
+        base_items_url = base_items_url[:-page_num_length] + "1"
+    else:
+        base_items_url = base_items_url + "&page=0"
+
+
     # Write all data
     for i in range(page_count):
-        items_url = base_items_url.replace("&page=" + str(i), "&page=" + str(i + 1))
-        page = requests.get(items_url)
+        base_items_url = base_items_url.replace("&page=" + str(i), "&page=" + str(i + 1))
+        page = requests.get(base_items_url)
         soup = BeautifulSoup(page.text, 'html.parser')
 
         # Check for captcha
         if not soup.find("table", {"class": "trade-list-table"}):
-            print("We catch captcha, go to:\n {}".format(items_url))
+            print("We catch captcha, go to:\n {}".format(base_items_url))
             input("Then press Enter here:")
-            page = requests.get(items_url)
+            page = requests.get(base_items_url)
             soup = BeautifulSoup(page.text, 'html.parser')
 
         # Get all body elements
@@ -123,7 +142,7 @@ def get_items_with_suggested_price(base_items_url, page_count=None):
                 if item.find("span", {"class": "gold-amount bold"}):
                     suggested_price = item.find("span", {"class": "gold-amount bold"})
                     suggested_price = filtering_data(suggested_price)
-                    name = item.find("div", {"class": "item-quality-epic"}).text.strip()
+                    name = item.find("div", {"class": item_quality}).text.strip()
                     whole_string = "{:>40} {:>30}\n".format(name, suggested_price)
                     with open(db_filename, 'a') as db_file:
                         db_file.write(whole_string)
