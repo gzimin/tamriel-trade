@@ -94,11 +94,11 @@ def get_items_with_suggested_price(base_items_url, page_count=None):
     # Write all data
     for i in range(page_count):
         base_items_url = base_items_url.replace("&page=" + str(i), "&page=" + str(i + 1))
-        page = requests.get(base_items_url)
-        soup = BeautifulSoup(page.text, 'html.parser')
 
         # Check for captcha
         check_for_captcha(base_items_url)
+        page = requests.get(base_items_url)
+        soup = BeautifulSoup(page.text, 'html.parser')
 
         # Get all body elements
         tbody_elem = soup.find("tbody")
